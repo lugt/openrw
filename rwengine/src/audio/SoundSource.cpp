@@ -3,6 +3,8 @@
 #include <loaders/LoaderSDT.hpp>
 #include <rw/types.hpp>
 
+#define HAVE_FFMPEG_CH_LAYOUT 1
+
 extern "C" {
 #include <libavformat/avformat.h>
 #include <libavformat/avio.h>
@@ -24,6 +26,14 @@ extern "C" {
 constexpr int kNumOutputChannels = 2;
 constexpr AVSampleFormat kOutputFMT = AV_SAMPLE_FMT_S16;
 constexpr size_t kNrFramesToPreload = 50;
+
+int get_nb_channels(AVFrame * frame) {
+    return frame->ch_layout.nb_channels;
+}
+
+int get_nb_channels(AVCodecContext * frame) {
+    return frame->ch_layout.nb_channels;
+}
 
 bool SoundSource::allocateAudioFrame() {
     frame = av_frame_alloc();
@@ -377,25 +387,36 @@ void SoundSource::decodeAndResampleFrames(const std::filesystem::path& filePath,
             while ((receiveFrame =
                         avcodec_receive_frame(codecContext, frame)) == 0) {
                 if (!swr) {
-                    if (frame->channels == 1 || frame->channel_layout == 0) {
-                        frame->channel_layout =
-                            av_get_default_channel_layout(1);
+                    RW_CHECK(frame != nullptr, "Frame pointer is null");
+                    if (frame == nullptr) {
+                        // error in processing... @Jason
+                        perror("Frame ptr is null in SoundSource.cpp");
+                        exit(2);
+                        return;
                     }
-                    swr = swr_alloc_set_opts(
-                        nullptr,
-                        AV_CH_LAYOUT_STEREO,    // output channel layout
+                    // Wasn't sure about what is this for....
+                    if (get_nb_channels(frame) == 1) {
+                        AVChannelLayout ch_layout;
+                        av_channel_layout_default(&ch_layout, 1);
+                        av_channel_layout_copy(&frame->ch_layout, &ch_layout);
+                    }
+                    AVChannelLayout out_lay = AV_CHANNEL_LAYOUT_STEREO;
+                    int sucflag = swr_alloc_set_opts2(
+                        &swr,
+                        &out_lay,    // output channel layout
                         kOutputFMT,             // output format
                         frame->sample_rate,     // output sample rate
-                        frame->channel_layout,  // input channel layout
+                        &frame->ch_layout,  // input channel layout
                         static_cast<AVSampleFormat>(
                             frame->format),  // input format
                         frame->sample_rate,  // input sample rate
                         0, nullptr);
-                    if (!swr) {
+                    if (0 != sucflag || swr == nullptr) {
                         RW_ERROR(
                             "Resampler has not been successfully allocated.");
                         return;
                     }
+                    assert(swr != nullptr);
                     swr_init(swr);
                     if (!swr_is_initialized(swr)) {
                         RW_ERROR(
@@ -406,12 +427,21 @@ void SoundSource::decodeAndResampleFrames(const std::filesystem::path& filePath,
 
                 // Decode audio packet
                 if (receiveFrame == 0 && sendPacket == 0) {
+#ifdef HAVE_FFMPEG_CH_LAYOUT
+                    // Write samples to audio buffer
+                    AVChannelLayout lst = AV_CHANNEL_LAYOUT_STEREO;
+                    av_channel_layout_copy(&resampled->ch_layout, &lst);
+                    resampled->sample_rate = frame->sample_rate;
+                    resampled->format = kOutputFMT;
+                    resampled->ch_layout.nb_channels = kNumOutputChannels;
+#else
+
                     // Write samples to audio buffer
                     resampled->channel_layout = AV_CH_LAYOUT_STEREO;
                     resampled->sample_rate = frame->sample_rate;
                     resampled->format = kOutputFMT;
                     resampled->channels = kNumOutputChannels;
-
+#endif
                     swr_config_frame(swr, resampled, frame);
 
                     if (swr_convert_frame(swr, resampled, frame) < 0) {
@@ -481,7 +511,7 @@ void SoundSource::exposeSoundMetadata() {
 }
 
 void SoundSource::exposeSfxMetadata(LoaderSDT& sdt) {
-    channels = static_cast<size_t>(codecContext->channels);
+    channels = static_cast<size_t>(get_nb_channels(codecContext));
     sampleRate = sdt.assetInfo.sampleRate;
 }
 
