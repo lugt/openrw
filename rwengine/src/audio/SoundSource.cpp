@@ -145,7 +145,7 @@ bool SoundSource::findAudioStreamSfx() {
     RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG),
              (TFile, "SoundSource::findAudioStreamSfx begin, formatContext = %0.llx\n",
               (UINT64) formatContext));
-    if (avformat_find_stream_info(formatContext, nullptr) < 0) {
+    if (true || avformat_find_stream_info(formatContext, nullptr) < 0) {
         RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG), (TFile, "SoundSource::findAudioStreamSfx find stream info failed.\n"));
         av_free(formatContext->pb->buffer);
         avio_context_free(&formatContext->pb);
