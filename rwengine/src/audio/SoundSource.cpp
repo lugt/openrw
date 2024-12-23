@@ -21,9 +21,11 @@ constexpr AVSampleFormat kOutputFMT = AV_SAMPLE_FMT_S16;
 constexpr size_t kNrFramesToPreload = 50;
 
 bool SoundSource::allocateAudioFrame() {
+    RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG), (TFile, "allocateAudioFrame\n"));
     frame = av_frame_alloc();
     if (!frame) {
         RW_ERROR("Error allocating the audio frame");
+        RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG), (TFile, "alloc frame error \n"));
         return false;
     }
     return true;
@@ -56,10 +58,17 @@ int read_packet(void* opaque, uint8_t* buf, int buf_size) {
 
 bool SoundSource::prepareFormatContextSfx(LoaderSDT& sdt, size_t index,
                                           bool asWave) {
+    RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG),
+             (TFile, "SoundSource::prepareFormatContextSfx, index = %d, asWave = %d\n",
+              (INT32) index, (INT32)asWave));
+
     /// Now we need to prepare "custom" format context
     /// We need sdt loader for that purpose
+    RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG), (TFile, "start to load to memory\n"));
     raw_sound = sdt.loadToMemory(index, asWave);
+    RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG), (TFile, "done load to memory\n"));
     if (!raw_sound) {
+        RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG), (TFile, "not raw sound, error, freeing for now...\n"));
         av_frame_free(&frame);
         RW_ERROR("Error loading sound");
         return false;
@@ -67,31 +76,43 @@ bool SoundSource::prepareFormatContextSfx(LoaderSDT& sdt, size_t index,
 
     /// Prepare input
     input.size = sizeof(WaveHeader) + sdt.assetInfo.size;
+    RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG), (TFile, "loaded to mem, input.size = %lu\n", input.size));
+
     /// Store start ptr of data to be able freed memory later
     inputDataStart = std::make_unique<uint8_t[]>(input.size);
     input.ptr = inputDataStart.get();
+
+    RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG), (TFile, "input.ptr = %0.llx\n", (UINT64) input.ptr));
 
     /// Alocate memory for buffer
     /// Memory freeded at the end
     static constexpr size_t ioBufferSize = 4096;
     auto ioBuffer = static_cast<uint8_t*>(av_malloc(ioBufferSize));
 
+    RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG), (TFile, "ioBuffer = %0.llx\n", (UINT64) ioBuffer));
+
     /// Cast pointer, in order to match required layout for ffmpeg
     input.ptr = reinterpret_cast<uint8_t*>(raw_sound.get());
 
+    RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG), (TFile, "start to avio_alloc_context\n"));
     /// Finally prepare our "custom" format context
     avioContext = avio_alloc_context(ioBuffer, ioBufferSize, 0, &input,
                                      &read_packet, nullptr, nullptr);
+    RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG), (TFile, "done avio, start to avformat_alloc_context\n"));
     formatContext = avformat_alloc_context();
     formatContext->pb = avioContext;
 
+    RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG), (TFile, "done all alloc, open input SDT file.\n"));
     if (avformat_open_input(&formatContext, "SDT", nullptr, nullptr) != 0) {
+        RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG), (TFile, "SDT file open failed...\n"));
         av_free(formatContext->pb->buffer);
         avio_context_free(&formatContext->pb);
         av_frame_free(&frame);
+        RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG), (TFile, "Freeded everything\n"));
         RW_ERROR("Error opening audio file (" << index << ")");
         return false;
     }
+    RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG), (TFile, "SDT file open success, returning...\n"));
     return true;
 }
 
@@ -121,7 +142,11 @@ bool SoundSource::findAudioStream(const std::filesystem::path& filePath) {
 }
 
 bool SoundSource::findAudioStreamSfx() {
+    RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG),
+             (TFile, "SoundSource::findAudioStreamSfx begin, formatContext = %0.llx\n",
+              (UINT64) formatContext));
     if (avformat_find_stream_info(formatContext, nullptr) < 0) {
+        RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG), (TFile, "SoundSource::findAudioStreamSfx find stream info failed.\n"));
         av_free(formatContext->pb->buffer);
         avio_context_free(&formatContext->pb);
         av_frame_free(&frame);
@@ -130,6 +155,7 @@ bool SoundSource::findAudioStreamSfx() {
         return false;
     }
 
+    RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG), (TFile, "SoundSource::findAudioStreamSfx start to find_best_stream\n"));
     // Find the audio stream
     int streamIndex = av_find_best_stream(formatContext, AVMEDIA_TYPE_AUDIO, -1,
                                           -1, nullptr, 0);
@@ -141,10 +167,10 @@ bool SoundSource::findAudioStreamSfx() {
         RW_ERROR("Could not find any audio stream in the file ");
         return false;
     }
-
+    RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG), (TFile, "SoundSource::findAudioStreamSfx start to find_decoder\n"));
     audioStream = formatContext->streams[streamIndex];
     codec = avcodec_find_decoder(audioStream->codecpar->codec_id);
-
+    RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG), (TFile, "SoundSource::findAudioStreamSfx end\n"));
     return true;
 }
 
@@ -219,11 +245,15 @@ bool SoundSource::prepareCodecContext() {
 }
 
 bool SoundSource::prepareCodecContextSfxWrap() {
+    RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG), (TFile, "SoundSource::prepareCodecContextSfxWrap begin\n"));
+    bool x = false;
 #if LIBAVCODEC_VERSION_INT < AV_VERSION_INT(57, 5, 0)
-    return prepareCodecContextSfxLegacy();
+    x = prepareCodecContextSfxLegacy();
 #else
-    return prepareCodecContextSfx();
+    x = prepareCodecContextSfx();
 #endif
+    RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG), (TFile, "SoundSource::prepareCodecContextSfxWrap end, return = %d\n", (INT32) x));
+    return x;
 }
 
 bool SoundSource::prepareCodecContextSfx() {
@@ -515,31 +545,48 @@ void SoundSource::decodeRestSfxFramesAndCleanup() {
 }
 
 void SoundSource::loadFromFile(const std::filesystem::path& filePath, bool streaming) {
+    RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG),
+             (TFile, "SoundSource::loadFromFile (%s) streaming = %d ....\n",
+              filePath.c_str(), (INT32) streaming));
     if (allocateAudioFrame() && allocateFormatContext(filePath) &&
         findAudioStream(filePath) && prepareCodecContextWrap()) {
         exposeSoundMetadata();
+        RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG), (TFile, "done expose, start alloc\n"));
         readingPacket = av_packet_alloc();
 
+        RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG), (TFile, "done alloc, start to decodeFrames\n"));
         decodeFramesWrap(filePath);
-
+        RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG), (TFile, "done decodeFrames\n"));
         if (streaming) {
+            RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG), (TFile, "creating async to load file, return for now\n"));
             loadingThread = std::async(
                 std::launch::async,
                 &SoundSource::decodeRestSoundFramesAndCleanup, this, filePath);
         } else {
             decodeRestSoundFramesAndCleanup(filePath);
+            RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG), (TFile, "load file successful, returning\n"));
         }
+    } else {
+        RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG), (TFile, "SoundSource::loadFromFile failed, continuing...\n"));
     }
 }
 
 void SoundSource::loadSfx(LoaderSDT& sdt, size_t index, bool asWave,
                           bool streaming) {
+    RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG),
+             (TFile, "SoundSource::loadSfx (index = %u), asWave = %d, "
+              "streaming = %d ....\n", (UINT32) index, (INT32) asWave,
+              (INT32) streaming));
     if (allocateAudioFrame() && prepareFormatContextSfx(sdt, index, asWave) &&
         findAudioStreamSfx() && prepareCodecContextSfxWrap()) {
+        RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG), (TFile, "start to exposeSfxMetadata\n"));
         exposeSfxMetadata(sdt);
+        RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG), (TFile, "expose done, start to alloc pack\n"));
         readingPacket = av_packet_alloc();
 
+        RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG), (TFile, "start to decodeSfx\n"));
         decodeFramesSfxWrap();
+        RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG), (TFile, "decodeFramesSfx finished\n"));
 
         if (streaming) {
             loadingThread =
@@ -549,4 +596,5 @@ void SoundSource::loadSfx(LoaderSDT& sdt, size_t index, bool asWave,
             decodeRestSfxFramesAndCleanup();
         }
     }
+    RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG), (TFile, "loadSfx finished\n"));
 }
