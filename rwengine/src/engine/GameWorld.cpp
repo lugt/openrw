@@ -419,6 +419,7 @@ PickupObject* GameWorld::createPickup(const glm::vec3& pos, int id, int type) {
         pickup->setBehaviourFlags(PickupObject::BehaviourFlags::PickupInVehicle);
     } else {
         RW_UNIMPLEMENTED("Non-weapon pickups");
+        RW_TRACE(Tracing(RWC_WORLD, TRACE_OPT_VERBOSE), (TFile, "non-weapon pickup info : %s\n", modelInfo->name.c_str()));
         pickup = std::make_unique<PickupObject>(this, pos, modelInfo, pickuptype);
     }
 

@@ -14,6 +14,7 @@ add_library(rwcore
     rw/forward.hpp
     rw/types.hpp
     rw/debug.hpp
+    rw/debug.cpp
 
     platform/FileHandle.hpp
     platform/FileIndex.hpp

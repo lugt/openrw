@@ -132,7 +132,7 @@ bool SoundManager::loadSound(const std::string& name,
 
     return sound->isLoaded;
 }
-
+// should check if SDT is available
 void SoundManager::loadSound(size_t index) {
     Sound* sound = nullptr;
 
@@ -141,10 +141,12 @@ void SoundManager::loadSound(size_t index) {
                     std::forward_as_tuple());
     sound = &it->second;
 
+    RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG), (TFile, "Sound source loading (%llu) ....\n", (UINT64) index));
     sound->source = std::make_shared<SoundSource>();
     sound->source->loadSfx(sdt, index);
+    RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG), (TFile, "Sound source finished loading (%llu) ....\n", (UINT64) index));
 }
-
+// Index stands for SFX content global index, i.e. index in .SFX file
 size_t SoundManager::createSfxInstance(size_t index) {
     Sound* sound = nullptr;
     auto soundRef = sfx.find(index);

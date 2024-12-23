@@ -14,6 +14,9 @@ int main(int argc, const char* argv[]) {
     StdOutReceiver logstdout;
     Logger logger({ &logstdout });
 
+    // Initialize tracing / debugging utils.
+    RW_init_trace_opts((RW_TRACE_KIND) 0xFFFFFF);
+
     RWArgumentParser argParser;
     auto argLayerOpt = argParser.parseArguments(argc, argv);
     if (!argLayerOpt.has_value()) {
