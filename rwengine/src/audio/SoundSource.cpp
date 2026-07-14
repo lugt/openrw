@@ -3,6 +3,8 @@
 #include <loaders/LoaderSDT.hpp>
 #include <rw/types.hpp>
 
+#include <cassert>
+
 extern "C" {
 #include <libavformat/avformat.h>
 #include <libavformat/avio.h>
@@ -19,6 +21,16 @@ extern "C" {
 constexpr int kNumOutputChannels = 2;
 constexpr AVSampleFormat kOutputFMT = AV_SAMPLE_FMT_S16;
 constexpr size_t kNrFramesToPreload = 50;
+
+#if HAVE_CH_LAYOUT
+int get_nb_channels(AVFrame * frame) {
+    return frame->ch_layout.nb_channels;
+}
+
+int get_nb_channels(AVCodecContext * frame) {
+    return frame->ch_layout.nb_channels;
+}
+#endif
 
 bool SoundSource::allocateAudioFrame() {
     RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG), (TFile, "allocateAudioFrame\n"));
@@ -400,6 +412,17 @@ void SoundSource::decodeAndResampleFrames(const std::filesystem::path& filePath,
                         avcodec_receive_frame(codecContext, frame)) == 0) {
                 if (!swr) {
 #if HAVE_CH_LAYOUT
+                    RW_CHECK(frame != nullptr, "Frame pointer is null");
+                    if (frame == nullptr) {
+                        RW_ERROR("Frame pointer is null in SoundSource.cpp");
+                        return;
+                    }
+                    // Ensure mono streams carry a valid channel layout
+                    if (get_nb_channels(frame) == 1) {
+                        AVChannelLayout ch_layout;
+                        av_channel_layout_default(&ch_layout, 1);
+                        av_channel_layout_copy(&frame->ch_layout, &ch_layout);
+                    }
                     AVChannelLayout out_chlayout = AV_CHANNEL_LAYOUT_STEREO;
                     err = swr_alloc_set_opts2(
                         &swr, &out_chlayout, kOutputFMT, frame->sample_rate,
@@ -408,7 +431,6 @@ void SoundSource::decodeAndResampleFrames(const std::filesystem::path& filePath,
                             frame->format),  // input format
                         frame->sample_rate,  // input sample rate
                         0, nullptr);
-
                     if (err < 0) {
                         RW_ERROR(
                             "Resampler has not been successfully allocated.");
@@ -435,6 +457,7 @@ void SoundSource::decodeAndResampleFrames(const std::filesystem::path& filePath,
                             "Resampler has not been successfully allocated.");
                         return;
                     }
+                    assert(swr != nullptr);
                     swr_init(swr);
                     if (!swr_is_initialized(swr)) {
                         RW_ERROR(
@@ -454,7 +477,6 @@ void SoundSource::decodeAndResampleFrames(const std::filesystem::path& filePath,
 #endif
                     resampled->sample_rate = frame->sample_rate;
                     resampled->format = kOutputFMT;
-
                     swr_config_frame(swr, resampled, frame);
 
                     if (swr_convert_frame(swr, resampled, frame) < 0) {
@@ -517,7 +539,7 @@ void SoundSource::exposeSoundMetadata() {
 
 void SoundSource::exposeSfxMetadata(LoaderSDT& sdt) {
 #if HAVE_CH_LAYOUT
-    channels = static_cast<size_t>(codecContext->ch_layout.nb_channels);
+    channels = static_cast<size_t>(get_nb_channels(codecContext));
 #else
     channels = static_cast<size_t>(codecContext->channels);
 #endif
