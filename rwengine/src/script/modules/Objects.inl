@@ -1154,10 +1154,35 @@ bool opcode_0202(const ScriptArguments& args, const ScriptCharacter character, c
     @arg explosionID Explosion ID
 */
 void opcode_020c(const ScriptArguments& args, ScriptVec3 coord, const ScriptExplosion explosionID) {
-    RW_UNIMPLEMENTED_OPCODE(0x020c);
-    RW_UNUSED(coord);
-    RW_UNUSED(explosionID);
-    RW_UNUSED(args);
+    RW_UNUSED(explosionID);  // @todo map explosion type ID to damage/radius
+    auto world = args.getWorld();
+    const float damageSize = 5.f;
+    const float damage = 100.f;
+
+    for (auto& o : world->allObjects) {
+        switch (o->type()) {
+            case GameObject::Instance:
+            case GameObject::Vehicle:
+            case GameObject::Character:
+                break;
+            default:
+                continue;
+        }
+        float d = glm::distance(coord, o->getPosition());
+        if (d > damageSize) continue;
+        o->takeDamage({GameObject::DamageInfo::DamageType::Explosion,
+                       coord, coord, damage / glm::max(d, 1.f), 0.f});
+    }
+
+    auto& explosion = world->createParticleEffect();
+    explosion.texture = world->data->findSlotTexture("particle", "explo02");
+    explosion.size = glm::vec2(10.f);
+    explosion.starttime = world->getGameTime();
+    explosion.lifetime = 0.5f;
+    explosion.orientation = ParticleFX::Camera;
+    explosion.colour = glm::vec4(1.0f);
+    explosion.position = coord;
+    explosion.direction = glm::vec3(0.f, 0.f, 1.f);
 }
 
 /**

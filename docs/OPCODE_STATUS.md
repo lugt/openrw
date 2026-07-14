@@ -3,7 +3,7 @@
 本文档由 `GTA3ModuleImpl.inl` 的 Doxygen `@brief` 与 `RW_UNIMPLEMENTED_OPCODE` 标记自动梳理 + 人工审校生成,反映 OpenRW 对 GTA III SCM 脚本虚拟机的实现进度。
 
 
-**总览**:opcode 904 个 | 已实现 513 (56%) | 未实现 391 (43%) | 条件opcode(bool 返回) 248
+**总览**:opcode 904 个 | 已实现 519 (57%) | 未实现 385 (43%) | 条件opcode(bool 返回) 248
 
 
 > 说明:`0x8000` 高位是"取反条件"标志(VM 层处理),注册表 key 始终是低 15 位。条件opcode 返回 bool,非条件返回 void。
@@ -15,10 +15,10 @@
 | ID 段 | 范围 | 已实现 | 未实现 | 实现率 |
 |---|---|---|---|---|
 | 0x00xx | 0x0000-0x00ff | 196 | 26 | 88% |
-| 0x01xx | 0x0100-0x01ff | 137 | 59 | 69% |
-| 0x02xx | 0x0200-0x02ff | 74 | 93 | 44% |
-| 0x03xx | 0x0300-0x03ff | 74 | 157 | 32% |
-| 0x04xx | 0x0400-0x04ff | 32 | 56 | 36% |
+| 0x01xx | 0x0100-0x01ff | 138 | 58 | 70% |
+| 0x02xx | 0x0200-0x02ff | 76 | 91 | 46% |
+| 0x03xx | 0x0300-0x03ff | 76 | 155 | 33% |
+| 0x04xx | 0x0400-0x04ff | 33 | 55 | 38% |
 
 ### 按功能域分布
 
@@ -31,15 +31,15 @@
 | 变量与数学运算 | 174 | 31 | 84% |
 | 摄像机 | 11 | 14 | 44% |
 | 过场动画 | 7 | 3 | 70% |
-| 角色与AI行为 | 79 | 108 | 42% |
-| 车辆 | 25 | 54 | 31% |
+| 角色与AI行为 | 83 | 104 | 44% |
+| 车辆 | 26 | 53 | 33% |
 | 拾取物与武器 | 4 | 1 | 80% |
 | 文本与UI | 15 | 41 | 26% |
 | 环境天气时间 | 5 | 3 | 62% |
 | 区域与车库 | 10 | 3 | 76% |
 | 地图标记 Blip | 5 | 0 | 100% |
 | 音频 | 4 | 3 | 57% |
-| 特效(粒子/爆炸/火焰) | 2 | 11 | 15% |
+| 特效(粒子/爆炸/火焰) | 3 | 10 | 23% |
 | 输入控制 | 1 | 2 | 33% |
 | 统计与存档 | 12 | 9 | 57% |
 | 其他(未归类) | 6 | 11 | 35% |
@@ -628,7 +628,7 @@
 | 0x0440 | stop_cutscene_music |  |
 
 
-### 角色与AI行为  (实现 79 / 未实现 108)
+### 角色与AI行为  (实现 83 / 未实现 104)
 
 **已实现**
 
@@ -649,6 +649,7 @@
 | 0x00f4 | actor %1d% near_actor_in_car %2d% radius %3d% %4d% %5h% | ✓ |
 | 0x0106 | actor %1d% near_actor_in_car %2d% radius %3d% %4d% %5d% %6h% | ✓ |
 | 0x0111 | set_wasted_busted_check_to %1benabled/disabled% |  |
+| 0x0113 | add_ammo_to_player %1d% weapon %2h% to %3d% |  |
 | 0x0117 | player %1d% wasted | ✓ |
 | 0x0118 | actor %1d% dead | ✓ |
 | 0x0121 | player %1d% in_zone %2z% | ✓ |
@@ -694,6 +695,8 @@
 | 0x02f5 | set_head_anim %1d% %2s% |  |
 | 0x0319 | set_actor %1d% running %2b:true/false% |  |
 | 0x0320 | actor %1d% in_range_of_player %2d% | ✓ |
+| 0x0321 | kill_actor %1d% |  |
+| 0x0322 | kill_player %1d% |  |
 | 0x0324 | set_zone_pedgroup_info %1z% %2b:day/night% %3u% |  |
 | 0x0336 | set_player %1d% visible %2d% |  |
 | 0x0337 | set_actor %1d% visible %2h% |  |
@@ -707,6 +710,7 @@
 | 0x03ef | player %1d% make_safe |  |
 | 0x0402 | increment_criminals_stopped |  |
 | 0x0414 | toggle_player %1d% free_treatment_once %2d% |  |
+| 0x0419 | get_ammo_of_player %1d% weapon %2c% store_to %3d% |  |
 | 0x0442 | player %1d% in_car %2d% | ✓ |
 | 0x0443 | player %1d% in_a_car | ✓ |
 | 0x0448 | actor %1d% in_car %2d% | ✓ |
@@ -727,7 +731,7 @@
 | 0x010d | set_player %1d% wanted_level_to %2d% |  |
 | 0x010e | set_player %1d% minimum_wanted_level_to %2d% |  |
 | 0x0110 | clear_player %1d% wanted_level |  |
-| 0x0113 | add_ammo_to_player %1d% weapon %2h% to %3d% |  |
+
 | 0x0114 | set_actor %1d% car_weapon %2h% ammo_to %3d% |  |
 | 0x011a | set_actor %1d% search_threat %2i% |  |
 | 0x011c | actor %1d% clear_objective |  |
@@ -784,8 +788,7 @@
 | 0x02e2 | set_actor %1d% weapon_accuracy_to %2d% |  |
 | 0x031d | actor %1d% hit_by_weapon %2d% | ✓ |
 | 0x031f | unknown_actor %1d% unknown_actor %2d% | ✓ |
-| 0x0321 | kill_actor %1d% |  |
-| 0x0322 | kill_player %1d% |  |
+
 | 0x0326 | set_actor_on_fire %1d% fire store_to %2d% |  |
 | 0x0330 | set_player %1d% infinite_run_to %2b:true/false% |  |
 | 0x0331 | set_player %1d% fast_reload %2h% |  |
@@ -811,7 +814,7 @@
 | 0x03f9 | make_actors %1d% %2d% converse_in %3d% ms |  |
 | 0x03fc | set_actor %1d% stays_on_current_island %2d% |  |
 | 0x0411 | set_actor %1d% use_pednode_seek %2d:true/false% |  |
-| 0x0419 | get_ammo_of_player %1d% weapon %2c% store_to %3d% |  |
+
 | 0x041a | get_ammo_of_actor %1d% weapon %2c% store_to %3d% |  |
 | 0x041c | make_actor %1d% say %2d% |  |
 | 0x0427 | create_save_peds_between_levels_cube %1d% %2d% %3d% to %4d% %5d% %6d% |  |
@@ -828,7 +831,7 @@
 | 0x0457 | is_player_targeting_char %1d% %2d% | ✓ |
 
 
-### 车辆  (实现 25 / 未实现 54)
+### 车辆  (实现 26 / 未实现 53)
 
 **已实现**
 
@@ -843,6 +846,7 @@
 | 0x0152 | set_zone_car_info %1s% %2bday/night% %3h% %4h% %5h% %6h% %7h% %8h% %9h% %10h% %11h% %12h% %13h% %14h% %15h% %16h% %17h% |  |
 | 0x0175 | set_car %1d% z_angle_to %2d% |  |
 | 0x01c3 | remove_references_to_car %1d% |  |
+| 0x020b | explode_car %1d% |  |
 | 0x020d | car %1d% is_upright | ✓ |
 | 0x021b | set_garage %1d% to_accept_car %2d% |  |
 | 0x021c | car_inside_garage %1d% | ✓ |
@@ -872,7 +876,7 @@
 | 0x01ec | make_car %1d% very_heavy %2h% |  |
 | 0x01f3 | car %1d% airborne | ✓ |
 | 0x020a | set_car %1d% door_status_to %2d% |  |
-| 0x020b | explode_car %1d% |  |
+
 | 0x0216 | set_car %1d% taxi_available_light_to %2b:on/off% |  |
 | 0x0220 | car %d has_car_bomb | ✓ |
 | 0x0231 | script_heli %1bon/off% |  |
@@ -1087,12 +1091,13 @@
 | 0x0451 | load_end_of_game_audio |  |
 
 
-### 特效(粒子/爆炸/火焰)  (实现 2 / 未实现 11)
+### 特效(粒子/爆炸/火焰)  (实现 3 / 未实现 10)
 
 **已实现**
 
 | Opcode | Brief | 条件 |
 |---|---|---|
+| 0x020c | create_explosion %4d% at %1d% %2d% %3d% |  |
 | 0x0404 | increment_fires_extinguished |  |
 | 0x0406 | save_dodo_flight_time %1d% |  |
 
@@ -1101,7 +1106,7 @@
 | Opcode | Brief | 条件 |
 |---|---|---|
 | 0x016f | create_particle %1a% %5d% %6d% %7d% %8d% %9d% %10d% at %2d% %3d% %4d% |  |
-| 0x020c | create_explosion %4d% at %1d% %2d% %3d% |  |
+
 | 0x0250 | create_light_at %1d% %2d% %3d% RGB_values %4d% %5d% %6d% |  |
 | 0x02a2 | create_particle %1a% %5d% at %2d% %3d% %4d% |  |
 | 0x02d0 | fire %1d% extinguished | ✓ |

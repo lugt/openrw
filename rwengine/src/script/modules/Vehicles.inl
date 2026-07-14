@@ -277,9 +277,42 @@ void opcode_020a(const ScriptArguments& args, const ScriptVehicle vehicle, const
     @arg vehicle Car/vehicle
 */
 void opcode_020b(const ScriptArguments& args, const ScriptVehicle vehicle) {
-    RW_UNIMPLEMENTED_OPCODE(0x020b);
-    RW_UNUSED(vehicle);
     RW_UNUSED(args);
+    const auto pos = vehicle->getPosition();
+    vehicle->setHealth(0.f);
+
+    // Spawn explosion VFX and apply area damage to nearby objects.
+    // Mirrors ProjectileObject::explode(); the vehicle itself is excluded
+    // because VehicleObject::takeDamage asserts hitpoints == 0.
+    auto world = args.getWorld();
+    const float damageSize = 5.f;
+    const float damage = 100.f;
+    auto self = vehicle.get();
+    for (auto& o : world->allObjects) {
+        if (o == self) continue;
+        switch (o->type()) {
+            case GameObject::Instance:
+            case GameObject::Vehicle:
+            case GameObject::Character:
+                break;
+            default:
+                continue;
+        }
+        float d = glm::distance(pos, o->getPosition());
+        if (d > damageSize) continue;
+        o->takeDamage({GameObject::DamageInfo::DamageType::Explosion,
+                       pos, pos, damage / glm::max(d, 1.f), 0.f});
+    }
+
+    auto& explosion = world->createParticleEffect();
+    explosion.texture = world->data->findSlotTexture("particle", "explo02");
+    explosion.size = glm::vec2(10.f);
+    explosion.starttime = world->getGameTime();
+    explosion.lifetime = 0.5f;
+    explosion.orientation = ParticleFX::Camera;
+    explosion.colour = glm::vec4(1.0f);
+    explosion.position = pos;
+    explosion.direction = glm::vec3(0.f, 0.f, 1.f);
 }
 
 /**

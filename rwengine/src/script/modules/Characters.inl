@@ -313,11 +313,12 @@ void opcode_0111(const ScriptArguments& args, const ScriptBoolean arg1) {
     @arg arg3 
 */
 void opcode_0113(const ScriptArguments& args, const ScriptPlayer player, const ScriptWeaponType weaponID, const ScriptInt arg3) {
-    RW_UNIMPLEMENTED_OPCODE(0x0113);
-    RW_UNUSED(player);
-    RW_UNUSED(weaponID);
-    RW_UNUSED(arg3);
     RW_UNUSED(args);
+    RW_CHECK(weaponID >= 0, "Weapon-ID too low");
+    auto plyChar = player->getCharacter();
+    RW_CHECK(weaponID < static_cast<int>(plyChar->getCurrentState().weapons.size()),
+             "Weapon-ID too high");
+    plyChar->addToInventory(weaponID, arg3);
 }
 
 /**
@@ -1764,9 +1765,9 @@ bool opcode_0320(const ScriptArguments& args, const ScriptCharacter character, c
     @arg character Character/ped
 */
 void opcode_0321(const ScriptArguments& args, const ScriptCharacter character) {
-    RW_UNIMPLEMENTED_OPCODE(0x0321);
-    RW_UNUSED(character);
     RW_UNUSED(args);
+    RW_CHECK(character.get() != nullptr, "kill_actor: character is null");
+    character->Die();
 }
 
 /**
@@ -1776,9 +1777,8 @@ void opcode_0321(const ScriptArguments& args, const ScriptCharacter character) {
     @arg player Player
 */
 void opcode_0322(const ScriptArguments& args, const ScriptPlayer player) {
-    RW_UNIMPLEMENTED_OPCODE(0x0322);
-    RW_UNUSED(player);
     RW_UNUSED(args);
+    player->getCharacter()->Die();
 }
 
 /**
@@ -2314,11 +2314,15 @@ void opcode_0414(const ScriptArguments& args, const ScriptPlayer player, const S
     @arg arg3 
 */
 void opcode_0419(const ScriptArguments& args, const ScriptPlayer player0, const ScriptWeaponType player1, ScriptInt& arg3) {
-    RW_UNIMPLEMENTED_OPCODE(0x0419);
-    RW_UNUSED(player0);
-    RW_UNUSED(player1);
-    RW_UNUSED(arg3);
     RW_UNUSED(args);
+    auto plyChar = player0->getCharacter();
+    if (player1 >= 0 &&
+        player1 < static_cast<int>(plyChar->getCurrentState().weapons.size())) {
+        arg3 = static_cast<ScriptInt>(
+            plyChar->getCurrentState().weapons[player1].bulletsTotal);
+    } else {
+        arg3 = 0;
+    }
 }
 
 /**
