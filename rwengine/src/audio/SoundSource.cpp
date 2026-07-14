@@ -57,9 +57,18 @@ bool SoundSource::allocateFormatContext(const std::filesystem::path& filePath) {
 namespace {
 /// Low level function for copying data from handler (opaque)
 /// to buffer.
+///
+/// Returns AVERROR_EOF (not 0) when the buffer is exhausted: FFmpeg's
+/// AVIOContext read callback treats a return of 0 as "no data yet, retry"
+/// rather than EOF, which makes av_read_frame()/avformat_find_stream_info()
+/// spin forever on an in-memory stream. This was the root cause of both the
+/// find_stream_info hang and the decode loop deadlock.
 int read_packet(void* opaque, uint8_t* buf, int buf_size) {
     auto* input = reinterpret_cast<InputData*>(opaque);
     buf_size = std::min(buf_size, static_cast<int>(input->size));
+    if (buf_size == 0) {
+        return AVERROR_EOF;
+    }
     /* copy internal data to buf */
     memcpy(buf, input->ptr, buf_size);
     input->ptr += buf_size;
@@ -86,28 +95,30 @@ bool SoundSource::prepareFormatContextSfx(LoaderSDT& sdt, size_t index,
         return false;
     }
 
-    /// Prepare input
+    /// Prepare input: the in-memory WAV is WaveHeader + raw PCM. raw_sound
+    /// already holds the fully-formed WAV (RIFF/fmt /data) when asWave is true,
+    /// otherwise raw PCM. Point the AVIOContext's InputData at it directly.
     input.size = sizeof(WaveHeader) + sdt.assetInfo.size;
     RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG), (TFile, "loaded to mem, input.size = %lu\n", input.size));
 
-    /// Store start ptr of data to be able freed memory later
-    inputDataStart = std::make_unique<uint8_t[]>(input.size);
-    input.ptr = inputDataStart.get();
+    input.ptr = reinterpret_cast<uint8_t*>(raw_sound.get());
 
     RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG), (TFile, "input.ptr = %0.llx\n", (UINT64) input.ptr));
 
-    /// Alocate memory for buffer
-    /// Memory freeded at the end
+    /// Allocate memory for the AVIOContext's internal read buffer.
+    /// Freed via av_free(formatContext->pb->buffer) during cleanup.
     static constexpr size_t ioBufferSize = 4096;
     auto ioBuffer = static_cast<uint8_t*>(av_malloc(ioBufferSize));
 
     RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG), (TFile, "ioBuffer = %0.llx\n", (UINT64) ioBuffer));
 
-    /// Cast pointer, in order to match required layout for ffmpeg
-    input.ptr = reinterpret_cast<uint8_t*>(raw_sound.get());
-
+    /// Finally prepare our "custom" format context. No seek callback: with a
+    /// seek callback avformat_open_input()'s format probing rewinds+rereads
+    /// tiny SFX buffers (some <3KB) indefinitely. Without seeking, the WAV
+    /// demuxer reads linearly to EOF and identifies the format in one pass.
+    /// read_packet() returns AVERROR_EOF at the end, so the probing and decode
+    /// loops terminate cleanly instead of spinning forever.
     RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG), (TFile, "start to avio_alloc_context\n"));
-    /// Finally prepare our "custom" format context
     avioContext = avio_alloc_context(ioBuffer, ioBufferSize, 0, &input,
                                      &read_packet, nullptr, nullptr);
     RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG), (TFile, "done avio, start to avformat_alloc_context\n"));
@@ -157,7 +168,10 @@ bool SoundSource::findAudioStreamSfx() {
     RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG),
              (TFile, "SoundSource::findAudioStreamSfx begin, formatContext = %0.llx\n",
               (UINT64) formatContext));
-    if (true || avformat_find_stream_info(formatContext, nullptr) < 0) {
+    // read_packet() now returns AVERROR_EOF at end of stream, so the probing
+    // loop terminates instead of hanging. Keep this call (rather than skipping
+    // it like the old if(true||) workaround) so codecpar is fully populated.
+    if (avformat_find_stream_info(formatContext, nullptr) < 0) {
         RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG), (TFile, "SoundSource::findAudioStreamSfx find stream info failed.\n"));
         av_free(formatContext->pb->buffer);
         avio_context_free(&formatContext->pb);
@@ -172,6 +186,7 @@ bool SoundSource::findAudioStreamSfx() {
     int streamIndex = av_find_best_stream(formatContext, AVMEDIA_TYPE_AUDIO, -1,
                                           -1, nullptr, 0);
     if (streamIndex < 0) {
+        RW_TRACE(Tracing(RWC_SOUNDMAN, TRACE_DEBUG), (TFile, "SoundSource::findAudioStreamSfx no audio stream found.\n"));
         av_free(formatContext->pb->buffer);
         avio_context_free(&formatContext->pb);
         av_frame_free(&frame);

@@ -98,7 +98,6 @@ private:
     // For sfx
     AVIOContext* avioContext;
     std::unique_ptr<char[]> raw_sound;
-    std::unique_ptr<uint8_t[]> inputDataStart;
     InputData input{};
 
     std::mutex mutex;
