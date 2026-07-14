@@ -1,6 +1,9 @@
 //
 // Created by jason.lu on 2024/12/23.
 //
+#include <cstdarg>
+#include <cstdio>
+#include <cstdlib>
 #include "types.hpp"
 #include "debug.hpp"
 
