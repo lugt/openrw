@@ -11,6 +11,28 @@
 #define RW_UNIMPLEMENTED_OPCODE(opcode)
 #endif
 
+#include <ai/PlayerController.hpp>
+#include <audio/SfxParameters.hpp>
+#include <core/Logger.hpp>
+#include <data/CutsceneData.hpp>
+#include <engine/Animator.hpp>
+#include <engine/GameData.hpp>
+#include <engine/GameState.hpp>
+#include <engine/GameWorld.hpp>
+#include <engine/Payphone.hpp>
+#include <objects/CharacterObject.hpp>
+#include <objects/CutsceneObject.hpp>
+#include <objects/InstanceObject.hpp>
+#include <objects/ObjectTypes.hpp>
+#include <objects/PickupObject.hpp>
+#include <objects/VehicleObject.hpp>
+#include <script/SCMFile.hpp>
+#include <script/ScriptFunctions.hpp>
+#include <script/ScriptMachine.hpp>
+#include <script/ScriptTypes.hpp>
+#include <boost/algorithm/string/predicate.hpp>
+
+#include "ControlFlow.inl"
 #include "GTA3ModuleImpl.inl"
 
 GTA3Module::GTA3Module() : ScriptModule("GTA3") {
