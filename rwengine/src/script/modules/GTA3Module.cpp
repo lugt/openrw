@@ -33,7 +33,15 @@
 #include <boost/algorithm/string/predicate.hpp>
 
 #include "ControlFlow.inl"
-#include "GTA3ModuleImpl.inl"
+#include "Variables.inl"
+#include "Objects.inl"
+#include "Characters.inl"
+#include "Vehicles.inl"
+#include "Camera.inl"
+#include "Mission.inl"
+#include "TextUI.inl"
+#include "World.inl"
+#include "Misc.inl"
 
 GTA3Module::GTA3Module() : ScriptModule("GTA3") {
     reserveFunctions(903);

@@ -146,7 +146,16 @@ set(RWENGINE_SOURCES
     src/script/ScriptTypes.hpp
     src/script/modules/GTA3Module.cpp
     src/script/modules/GTA3Module.hpp
-    src/script/modules/GTA3ModuleImpl.inl
+    src/script/modules/ControlFlow.inl
+    src/script/modules/Variables.inl
+    src/script/modules/Objects.inl
+    src/script/modules/Characters.inl
+    src/script/modules/Vehicles.inl
+    src/script/modules/Camera.inl
+    src/script/modules/Mission.inl
+    src/script/modules/TextUI.inl
+    src/script/modules/World.inl
+    src/script/modules/Misc.inl
     )
 
 add_library(rwengine
