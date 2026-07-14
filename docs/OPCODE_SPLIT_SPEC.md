@@ -1,5 +1,7 @@
 # Opcode 文件拆分 Spec
 
+> **状态:已完成 (2026-07-14)** — `GTA3ModuleImpl.inl`(原 12894 行)已删除,904 个 opcode 迁入 10 个域文件。提交链:4fd0de4e(阶段0 ControlFlow) → b1a555d5(剩余 9 域)。编译链接通过,`--newgame` 运行冒烟无 `IllegalInstruction`。
+
 ## 一、背景与动机
 
 `rwengine/src/script/modules/GTA3ModuleImpl.inl` 当前 **12894 行 / 326KB**,包含全部 904 个 SCM opcode 实现函数。对 AI Agent 工作流带来:
