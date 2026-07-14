@@ -6,3 +6,5 @@ documentation/
 *.user*
 .DS_Store
 .vscode/
+.idea/
+imgui.ini
