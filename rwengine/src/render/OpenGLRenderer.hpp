@@ -198,6 +198,13 @@ public:
         return viewport;
     }
 
+    /**
+     * Override the 2D orthographic projection so it spans the given
+     * reference coordinate space (used for HUD/text/map rendering with
+     * absolute pixel sizes). Defaults to spanning the current viewport.
+     */
+    void setProjection2DSize(float refW, float refH);
+
     const glm::mat4& get2DProjection() const {
         return projection2D;
     }

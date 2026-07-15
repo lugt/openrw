@@ -559,4 +559,14 @@ void GameRenderer::setViewport(int w, int h) {
         glBindRenderbuffer(GL_RENDERBUFFER, fbRenderBuffers[0]);
         glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, w, h);
     }
+
+    // Pin the 2D orthographic projection to a fixed reference coordinate
+    // space so HUD elements drawn with absolute pixel sizes
+    // (uiTextSize=25, uiMapSize=150, uiWeaponSize=64, ...) keep the same
+    // visual size regardless of how big the actual framebuffer/window is
+    // (HiDPI, fullscreen, super-sampling). The 3D scene continues to use
+    // the viewport-sized projection set by Renderer::setViewport above.
+    constexpr float kHUDReferenceWidth = 1280.f;
+    constexpr float kHUDReferenceHeight = 720.f;
+    renderer->setProjection2DSize(kHUDReferenceWidth, kHUDReferenceHeight);
 }
