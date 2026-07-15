@@ -8,3 +8,4 @@ documentation/
 .vscode/
 .idea/
 imgui.ini
+opcode_usage.txt

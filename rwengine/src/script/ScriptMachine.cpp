@@ -1,8 +1,11 @@
 #include "script/ScriptMachine.hpp"
 
 #include <algorithm>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
+#include <vector>
 
 #include "ai/PlayerController.hpp"
 #include "core/Logger.hpp"
@@ -11,6 +14,7 @@
 #include "engine/GameWorld.hpp"
 #include "script/SCMFile.hpp"
 #include "script/ScriptModule.hpp"
+#include "script/UnimplementedOpcodes.hpp"
 
 void ScriptMachine::executeThread(SCMThread& t, int msPassed) {
     auto player = state->world->getPlayer();
@@ -42,6 +46,8 @@ void ScriptMachine::executeThread(SCMThread& t, int msPassed) {
         bool isNegatedConditional = ((opcode & SCM_NEGATE_CONDITIONAL_MASK) ==
                                      SCM_NEGATE_CONDITIONAL_MASK);
         opcode = opcode & ~SCM_NEGATE_CONDITIONAL_MASK;
+
+        ++opcodeCallCounts[opcode];
 
         ScriptFunctionMeta* foundcode;
         if (!module->findOpcode(opcode, &foundcode)) {
@@ -235,5 +241,66 @@ void ScriptMachine::execute(float dt) {
         if (thread.finished) {
             t = _activeThreads.erase(t);
         }
+    }
+
+    // Periodic opcode-usage flush: writing to opcode_usage.txt every
+    // kProfileDumpIntervalSec means a SIGKILL only loses the last interval.
+    profileAccumulator += dt;
+    if (profileAccumulator >= kProfileDumpIntervalSec) {
+        profileAccumulator = 0.f;
+        dumpOpcodeUsage(false);
+    }
+}
+
+ScriptMachine::~ScriptMachine() {
+    // Final complete dump on clean exit. Overwrites the last periodic snapshot.
+    dumpOpcodeUsage(true);
+}
+
+void ScriptMachine::dumpOpcodeUsage(bool finalDump) const {
+    // Written to the game's working directory (cwd at launch).
+    // Periodic dumps overwrite this file; a SIGKILL leaves the last snapshot.
+    const char* path = "opcode_usage.txt";
+    std::ofstream out(path);
+    if (!out.is_open()) {
+        return;
+    }
+
+    const auto& unimpl = script::unimplementedOpcodes();
+
+    // Sort by call count, descending.
+    std::vector<std::pair<uint16_t, uint64_t>> sorted(
+        opcodeCallCounts.begin(), opcodeCallCounts.end());
+    std::sort(sorted.begin(), sorted.end(),
+              [](const auto& a, const auto& b) { return a.second > b.second; });
+
+    uint64_t totalCalls = 0;
+    uint64_t unimplCalls = 0;
+    for (const auto& kv : sorted) {
+        totalCalls += kv.second;
+        if (unimpl.count(kv.first)) unimplCalls += kv.second;
+    }
+
+    out << "# Opcode usage profile"
+        << (finalDump ? " (final, on exit)" : " (periodic snapshot)")
+        << "\n";
+    out << "# distinct opcodes executed: " << sorted.size() << " / 904\n";
+    out << "# total opcode dispatches:  " << totalCalls << "\n";
+    out << "# unimplemented dispatches:  " << unimplCalls << " ("
+        << (totalCalls ? 100 * unimplCalls / totalCalls : 0) << "% of total)\n";
+    out << "# file overwritten on each dump; safe to read mid-run.\n\n";
+    out << "rank  opcode   status    calls         %total\n";
+    out << "----  ------   -------   ------------  -------\n";
+
+    int rank = 1;
+    for (const auto& kv : sorted) {
+        bool isUnimpl = unimpl.count(kv.first) != 0;
+        out << std::setw(4) << rank++ << "  0x" << std::hex
+            << std::setw(4) << std::setfill('0') << kv.first << std::dec
+            << std::setfill(' ') << "  "
+            << (isUnimpl ? "UNIMPL" : "impl  ") << "  " << std::setw(12)
+            << kv.second << "  " << std::setw(6) << std::fixed
+            << std::setprecision(2)
+            << (totalCalls ? 100.0 * kv.second / totalCalls : 0.0) << "%\n";
     }
 }

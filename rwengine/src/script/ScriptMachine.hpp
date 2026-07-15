@@ -9,6 +9,7 @@
 #include <sstream>
 #include <string>
 #include <type_traits>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -130,7 +131,7 @@ struct SCMThread {
 class ScriptMachine {
 public:
     ScriptMachine(GameState* state, SCMFile& file, ScriptModule* ops);
-    ~ScriptMachine() = default;
+    ~ScriptMachine();
 
     SCMFile& getFile() const {
         return file;
@@ -180,6 +181,14 @@ private:
     void executeThread(SCMThread& t, int msPassed);
 
     std::vector<SCMByte> globalData;
+
+    // --- Opcode usage profiling -------------------------------------------
+    // Counts how many times each opcode is executed. Periodically flushed to
+    // disk (see dumpOpcodeUsage) so a SIGKILL only loses the last interval.
+    std::unordered_map<uint16_t, uint64_t> opcodeCallCounts;
+    float profileAccumulator = 0.f;  ///< seconds since last periodic dump
+    static constexpr float kProfileDumpIntervalSec = 30.f;
+    void dumpOpcodeUsage(bool finalDump) const;
 };
 
 #endif
