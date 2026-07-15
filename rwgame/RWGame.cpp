@@ -1,4 +1,4 @@
-﻿#include "RWGame.hpp"
+#include "RWGame.hpp"
 
 #include <glm/gtx/norm.hpp>
 

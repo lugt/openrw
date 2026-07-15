@@ -34,6 +34,14 @@ enum class ScreenTextType {
 constexpr unsigned int ScreenTypeTextCount =
     static_cast<unsigned int>(ScreenTextType::_Count);
 
+/// GTA III's virtual/script screen coordinate space. SCM text-draw opcodes
+/// (0x033e text_draw and friends) and the HUD parameters are authored against
+/// this reference resolution: a logical 640x480 canvas. Real rendering spans the
+/// physical framebuffer, so positions/sizes are scaled from these by the
+/// effective DPI scale (viewport.y / kScreenVirtualHeight).
+constexpr float kScreenVirtualWidth = 640.f;
+constexpr float kScreenVirtualHeight = 480.f;
+
 /**
  * @brief The ScreenTextEntry struct
  *
@@ -42,7 +50,7 @@ constexpr unsigned int ScreenTypeTextCount =
 struct ScreenTextEntry {
     /// After processing numbers
     GameString text;
-    /// in the virtual 640x480 screen space
+    /// in the virtual screen space (kScreenVirtualWidth x kScreenVirtualHeight)
     glm::vec2 position{};
     /// Font number
     int font;

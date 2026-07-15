@@ -5,6 +5,7 @@
 #include <engine/GameData.hpp>
 #include <engine/GameState.hpp>
 #include <engine/GameWorld.hpp>
+#include <engine/ScreenText.hpp>
 #include <objects/CharacterObject.hpp>
 #include <render/GameRenderer.hpp>
 
@@ -17,12 +18,14 @@
 void HUDDrawer::drawScriptTimer(GameWorld* world, GameRenderer& render) {
     if (world->state->scriptTimerVariable) {
         float scriptTimerTextX = static_cast<float>(
-            render.getRenderer().getViewport().x - hudParameters.uiOuterMargin);
-        float scriptTimerTextY = hudParameters.uiScriptTimerHeight;
+            render.getRenderer().getViewport().x -
+            hudParameters.uiOuterMargin * dpiScale);
+        float scriptTimerTextY =
+            hudParameters.uiScriptTimerHeight * dpiScale;
 
         TextRenderer::TextInfo ti;
         ti.font = FONT_PRICEDOWN;
-        ti.size = hudParameters.uiTextSize;
+        ti.size = hudParameters.uiTextSize * dpiScale;
         ti.align = TextRenderer::TextInfo::TextAlignment::Right;
 
         {
@@ -62,13 +65,13 @@ void HUDDrawer::drawMap(ViewCamera& currentView, ai::PlayerController* player,
 
         const glm::ivec2& vp = render.getRenderer().getViewport();
 
-        glm::vec2 mapTop =
-            glm::vec2(hudParameters.uiOuterMargin, vp.y - (hudParameters.uiOuterMargin + hudParameters.uiMapSize));
-        glm::vec2 mapBottom =
-            glm::vec2(hudParameters.uiOuterMargin + hudParameters.uiMapSize, vp.y - hudParameters.uiOuterMargin);
+        const float margin = hudParameters.uiOuterMargin * dpiScale;
+        const float mapSize = hudParameters.uiMapSize * dpiScale;
+        glm::vec2 mapTop = glm::vec2(margin, vp.y - (margin + mapSize));
+        glm::vec2 mapBottom = glm::vec2(margin + mapSize, vp.y - margin);
 
         map.screenPosition = (mapTop + mapBottom) / 2.f;
-        map.screenSize = hudParameters.uiMapSize * 0.95f;
+        map.screenSize = mapSize * 0.95f;
 
         render.map.draw(world, map);
     }
@@ -76,18 +79,22 @@ void HUDDrawer::drawMap(ViewCamera& currentView, ai::PlayerController* player,
 
 void HUDDrawer::drawPlayerInfo(ai::PlayerController* player, GameWorld* world,
                                GameRenderer& render) {
+    const float margin = hudParameters.uiOuterMargin * dpiScale;
+    const float weaponSize = hudParameters.uiWeaponSize * dpiScale;
+    const float infoMargin = hudParameters.uiInfoMargin * dpiScale;
+    const float textHeight = hudParameters.uiTextHeight * dpiScale;
     float infoTextX = static_cast<float>(render.getRenderer().getViewport().x -
-                      (hudParameters.uiOuterMargin + hudParameters.uiWeaponSize + hudParameters.uiInfoMargin));
-    float infoTextY = 0.f + hudParameters.uiOuterMargin;
+                      (margin + weaponSize + infoMargin));
+    float infoTextY = 0.f + margin;
     float iconX = static_cast<float>(render.getRenderer().getViewport().x -
-                  (hudParameters.uiOuterMargin + hudParameters.uiWeaponSize));
-    float iconY = hudParameters.uiOuterMargin;
-    float wantedX = static_cast<float>(render.getRenderer().getViewport().x - hudParameters.uiOuterMargin);
-    float wantedY = hudParameters.uiWantedLevelHeight;
+                  (margin + weaponSize));
+    float iconY = margin;
+    float wantedX = static_cast<float>(render.getRenderer().getViewport().x - margin);
+    float wantedY = hudParameters.uiWantedLevelHeight * dpiScale;
 
     TextRenderer::TextInfo ti;
     ti.font = FONT_PRICEDOWN;
-    ti.size = hudParameters.uiTextSize;
+    ti.size = hudParameters.uiTextSize * dpiScale;
     ti.align = TextRenderer::TextInfo::TextAlignment::Right;
 
     {
@@ -107,7 +114,7 @@ void HUDDrawer::drawPlayerInfo(ai::PlayerController* player, GameWorld* world,
 
     render.text.renderText(ti);
 
-    infoTextY += hudParameters.uiTextHeight;
+    infoTextY += textHeight;
 
     {
         std::stringstream ss;
@@ -126,7 +133,7 @@ void HUDDrawer::drawPlayerInfo(ai::PlayerController* player, GameWorld* world,
     ti.screenPosition = glm::vec2(infoTextX, infoTextY);
     render.text.renderText(ti);
 
-    infoTextY += hudParameters.uiTextHeight;
+    infoTextY += textHeight;
 
     if ((world->state->hudFlash != HudFlash::FlashHealth &&
          player->getCharacter()->getCurrentState().health > hudParameters.uiLowHealth) ||
@@ -157,11 +164,11 @@ void HUDDrawer::drawPlayerInfo(ai::PlayerController* player, GameWorld* world,
 
         ti.baseColour = hudParameters.uiShadowColour;
         ti.screenPosition =
-            glm::vec2(infoTextX + 1.f - hudParameters.uiArmourOffset, infoTextY + 1.f);
+            glm::vec2(infoTextX + 1.f - hudParameters.uiArmourOffset * dpiScale, infoTextY + 1.f);
         render.text.renderText(ti);
 
         ti.baseColour = hudParameters.uiArmourColour;
-        ti.screenPosition = glm::vec2(infoTextX - hudParameters.uiArmourOffset, infoTextY);
+        ti.screenPosition = glm::vec2(infoTextX - hudParameters.uiArmourOffset * dpiScale, infoTextY);
         render.text.renderText(ti);
     }
 
@@ -209,8 +216,8 @@ void HUDDrawer::drawPlayerInfo(ai::PlayerController* player, GameWorld* world,
     if (itemTexturePtr != nullptr) {
         RW_CHECK(itemTexturePtr->getName() != 0, "Item has 0 texture");
         render.drawTexture(itemTexturePtr,
-                           glm::vec4(iconX, iconY, hudParameters.uiWeaponSize,
-                                     hudParameters.uiWeaponSize));
+                           glm::vec4(iconX, iconY, weaponSize,
+                                     weaponSize));
     }
 
     if (weapon.fireType != WeaponData::MELEE) {
@@ -242,16 +249,21 @@ void HUDDrawer::drawPlayerInfo(ai::PlayerController* player, GameWorld* world,
 
         ti.baseColour = hudParameters.uiShadowColour;
         ti.font = FONT_ARIAL;
-        ti.size = hudParameters.uiAmmoSize;
+        ti.size = hudParameters.uiAmmoSize * dpiScale;
         ti.align = TextRenderer::TextInfo::TextAlignment::Center;
-        ti.screenPosition = glm::vec2(iconX + hudParameters.uiWeaponSize / 2.f,
-                                      iconY + hudParameters.uiWeaponSize - hudParameters.uiAmmoHeight);
+        ti.screenPosition = glm::vec2(iconX + weaponSize / 2.f,
+                                      iconY + weaponSize - hudParameters.uiAmmoHeight * dpiScale);
         render.text.renderText(ti);
     }
 }
 
 void HUDDrawer::drawHUD(ViewCamera& currentView, ai::PlayerController* player,
                         GameWorld* world, GameRenderer& render) {
+    // 2D projection spans the physical viewport (HiDPI framebuffer), but the
+    // HUD parameters are in GTA III design pixels (reference height
+    // kScreenVirtualHeight). Scale them so HUD elements keep their visual size
+    // across resolutions.
+    dpiScale = render.getRenderer().getViewport().y / kScreenVirtualHeight;
     if (player && player->getCharacter()) {
         drawMap(currentView, player, world, render);
         drawPlayerInfo(player, world, render);
@@ -260,22 +272,25 @@ void HUDDrawer::drawHUD(ViewCamera& currentView, ai::PlayerController* player,
 }
 
 void HUDDrawer::drawOnScreenText(GameWorld* world, GameRenderer& renderer) {
+    dpiScale = renderer.getRenderer().getViewport().y / kScreenVirtualHeight;
     const auto vp = glm::vec2(renderer.getRenderer().getViewport());
 
     TextRenderer::TextInfo ti;
     ti.font = FONT_ARIAL;
-    ti.screenPosition = glm::vec2(10.f, 10.f);
-    ti.size = 20.f;
+    ti.screenPosition = glm::vec2(10.f, 10.f) * dpiScale;
+    ti.size = 20.f * dpiScale;
 
     auto& alltext = world->state->text.getAllText();
 
     for (auto& l : alltext) {
         for (auto& t : l) {
-            ti.size = static_cast<float>(t.size * hudParameters.hudScale);
+            ti.size = static_cast<float>(t.size * hudParameters.hudScale *
+                                         dpiScale);
             ti.font = t.font;
             ti.text = t.text;
             ti.wrapX = t.wrapX;
-            ti.screenPosition = (t.position / glm::vec2(640.f, 480.f)) * vp;
+            ti.screenPosition =
+                (t.position / glm::vec2(kScreenVirtualWidth, kScreenVirtualHeight)) * vp;
             switch (t.alignment) {
                 case 0:
                     ti.align = TextRenderer::TextInfo::TextAlignment::Left;
