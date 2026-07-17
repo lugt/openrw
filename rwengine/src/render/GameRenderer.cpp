@@ -502,11 +502,19 @@ void GameRenderer::drawColour(const glm::vec4& colour, glm::vec4 extents) {
 }
 
 void GameRenderer::drawRect(const glm::vec4& colour, TextureData* texture, glm::vec4& extents) {
+    // Extents arrive in the same logical (window-point) space as the 2D
+    // projection (see setLogicalSize). Normalise by the logical size so the
+    // result lands in NDC consistently with HUD/menu/text drawn through
+    // projection2D. rwviewer never calls setLogicalSize, so fall back to the
+    // physical viewport there (its callers pass physical coords).
+    const glm::ivec2 ref = (logicalSize.x > 0 && logicalSize.y > 0)
+                               ? logicalSize
+                               : renderer->getViewport();
     // Move into NDC
-    extents.x /= renderer->getViewport().x;
-    extents.y /= renderer->getViewport().y;
-    extents.z /= renderer->getViewport().x;
-    extents.w /= renderer->getViewport().y;
+    extents.x /= ref.x;
+    extents.y /= ref.y;
+    extents.z /= ref.x;
+    extents.w /= ref.y;
     extents.x += extents.z / 2.f;
     extents.y += extents.w / 2.f;
     extents.x -= .5f;

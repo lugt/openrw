@@ -651,12 +651,19 @@ void RWGame::render(float alpha, float time) {
     }
 
     glm::ivec2 windowSize = getWindow().getSize();
+    glm::ivec2 logicalSize = getWindow().getLogicalSize();
     renderer.setViewport(windowSize.x, windowSize.y);
+    renderer.setLogicalSize(logicalSize.x, logicalSize.y);
+    // 2D HUD/menu/text layer runs in logical (window) pixel space so it lines
+    // up with logical mouse events and ImGui. glViewport still spans the
+    // physical framebuffer (set above), keeping HiDPI rendering crisp.
+    renderer.getRenderer().setProjection2D(
+        static_cast<float>(logicalSize.x), static_cast<float>(logicalSize.y));
 
     ViewCamera viewCam = currentCam;
 
     viewCam.frustum.aspectRatio =
-        windowSize.x / static_cast<float>(windowSize.y);
+        logicalSize.x / static_cast<float>(logicalSize.y);
 
     if (state.isCinematic) {
         viewCam.frustum.fov *= viewCam.frustum.aspectRatio;

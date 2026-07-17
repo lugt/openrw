@@ -82,3 +82,10 @@ glm::ivec2 GameWindow::getSize() const {
 
     return glm::ivec2(x, y);
 }
+
+glm::ivec2 GameWindow::getLogicalSize() const {
+    int x, y;
+    SDL_GetWindowSize(window, &x, &y);
+
+    return glm::ivec2(x, y);
+}

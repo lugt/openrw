@@ -12,6 +12,7 @@
 #include <glm/vec2.hpp>
 
 #include <fonts/GameTexts.hpp>
+#include <engine/ScreenText.hpp>
 #include <rw/debug.hpp>
 
 class GameRenderer;
@@ -106,6 +107,14 @@ private:
     int font;
     float size;
     std::vector<MenuEntry> entries;
+
+    /// Scale from design pixels (640x480 reference) to logical window space.
+    /// The menu is laid out in design pixels (offset/size); the 2D projection
+    /// spans the logical window, so both rendering and mouse hit-testing apply
+    /// this scale. Updated each frame in draw(); reused by hover()/click() for
+    /// the same frame's events. Window size is effectively constant between
+    /// frames, so the value is valid for events arriving before the next draw.
+    float designScale = 1.f;
 };
 
 #endif

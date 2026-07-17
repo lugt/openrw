@@ -122,6 +122,17 @@ public:
 
     void setViewport(int w, int h);
 
+    /// Logical (window-point) 2D coordinate space the HUD/menu/text layer is
+    /// laid out in. Set each frame alongside setViewport; the physical viewport
+    /// (getRenderer().getViewport()) still drives glViewport/FBO. Mouse events
+    /// and ImGui are in this logical space, so 2D UI must be too.
+    void setLogicalSize(int w, int h) {
+        logicalSize = glm::ivec2(w, h);
+    }
+    const glm::ivec2& getLogicalSize() const {
+        return logicalSize;
+    }
+
     void setCullOverride(bool override, const ViewCamera& cullCamera) {
         cullingCamera = cullCamera;
         cullOverride = override;
@@ -165,6 +176,9 @@ private:
     void renderObjects(const GameWorld *world);
 
     RenderList createObjectRenderList(const GameWorld *world);
+
+    /// Logical (window-point) 2D size; see setLogicalSize.
+    glm::ivec2 logicalSize{};
 };
 
 #endif

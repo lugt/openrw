@@ -359,7 +359,10 @@ void IngameState::handlePlayerInput(const SDL_Event& event) {
             break;
         case SDL_MOUSEMOTION:
             if (game->hasFocus()) {
-                glm::ivec2 screenSize = getWindow().getSize();
+                // xrel is a logical-pixel delta (SDL mouse motion is in window
+                // points), so normalise by the logical window size, not the
+                // physical framebuffer.
+                glm::ivec2 screenSize = getWindow().getLogicalSize();
                 glm::vec2 mouseMove(
                     event.motion.xrel / static_cast<float>(screenSize.x),
                     event.motion.yrel / static_cast<float>(screenSize.y));

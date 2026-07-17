@@ -199,11 +199,14 @@ public:
     }
 
     /**
-     * Override the 2D orthographic projection so it spans the given
-     * reference coordinate space (used for HUD/text/map rendering with
-     * absolute pixel sizes). Defaults to spanning the current viewport.
+     * Override the 2D orthographic projection so it spans the given reference
+     * coordinate space, decoupling it from the physical viewport. Used by the
+     * game to run the 2D HUD/menu/text layer in logical (window) pixel space so
+     * that logical mouse events and ImGui line up with rendered UI, while the
+     * physical viewport (getSize) still drives glViewport/FBO. Defaults to
+     * spanning the current viewport when not called (rwviewer behaviour).
      */
-    void setProjection2DSize(float refW, float refH);
+    void setProjection2D(float refW, float refH);
 
     const glm::mat4& get2DProjection() const {
         return projection2D;

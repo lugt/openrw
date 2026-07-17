@@ -19,36 +19,40 @@ void Menu::MenuEntry::draw(font_t font, float size, bool active,
 }
 
 void Menu::draw(GameRenderer &r) {
-    glm::vec2 basis(offset);
+    designScale = r.getLogicalSize().y / kScreenVirtualHeight;
+    const float scaledSize = size * designScale;
+    glm::vec2 basis(offset * designScale);
     for (size_t i = 0; i < entries.size(); ++i) {
         bool active = false;
         if (activeEntry >= 0 && i == static_cast<unsigned>(activeEntry)) {
             active = true;
         }
-        entries[i].draw(font, size, active, r, basis);
+        entries[i].draw(font, scaledSize, active, r, basis);
     }
 }
 
 void Menu::hover(const float x, const float y) {
-    glm::vec2 c(x - offset.x, y - offset.y);
+    const float scaledSize = size * designScale;
+    glm::vec2 c(x - offset.x * designScale, y - offset.y * designScale);
     for (size_t i = 0; i < entries.size(); ++i) {
-        if (c.y > 0.f && c.y < size) {
+        if (c.y > 0.f && c.y < scaledSize) {
             activeEntry = static_cast<int>(i);
             return;
         } else {
-            c.y -= size;
+            c.y -= scaledSize;
         }
     }
 }
 
 void Menu::click(const float x, const float y) {
-    glm::vec2 c(x - offset.x, y - offset.y);
+    const float scaledSize = size * designScale;
+    glm::vec2 c(x - offset.x * designScale, y - offset.y * designScale);
     for (auto &entry : entries) {
-        if (c.y > 0.f && c.y < size) {
+        if (c.y > 0.f && c.y < scaledSize) {
             entry.activate(c.x, c.y);
             return;
         } else {
-            c.y -= size;
+            c.y -= scaledSize;
         }
     }
 }

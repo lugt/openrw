@@ -35,7 +35,9 @@ void PauseState::tick(float dt) {
 void PauseState::draw(GameRenderer& r) {
     MapRenderer::MapInfo map;
 
-    auto& vp = r.getRenderer().getViewport();
+    // Full-screen pause map: MapRenderer draws through projection2D, which
+    // spans the logical (window) size, so feed it logical coordinates.
+    auto& vp = r.getLogicalSize();
 
     map.worldSize = 4000.f;
     map.clipToSize = false;

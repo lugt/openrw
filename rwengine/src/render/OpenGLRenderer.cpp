@@ -103,7 +103,7 @@ void Renderer::setViewport(const glm::ivec2& vp) {
                               static_cast<float>(viewport.y), 0.f, -1.f, 1.f);
 }
 
-void Renderer::setProjection2DSize(float refW, float refH) {
+void Renderer::setProjection2D(float refW, float refH) {
     projection2D = glm::ortho(0.f, refW, refH, 0.f, -1.f, 1.f);
 }
 

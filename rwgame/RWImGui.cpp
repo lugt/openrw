@@ -81,13 +81,16 @@ void WindowDebugObjects(RWGame& game, const ViewCamera& camera) {
     const auto& view = camera.position;
     const auto& model = camera.getView();
     const auto& proj = camera.frustum.projection();
-    const auto& size = game.getWindow().getSize();
+    const auto& size = game.getWindow().getLogicalSize();
     glm::vec4 viewport(0.f, 0.f, size.x, size.y);
     auto isnearby = [&](GameObject* o) {
         return glm::distance2(o->getPosition(), view) <
                kNearbyDistance * kNearbyDistance;
     };
     auto showdata = [&](GameObject* o, std::stringstream& ss) {
+        // glm::project yields coordinates in the same space as the viewport
+        // vector; use the logical (window) size so the result lines up with
+        // ImGui's logical-space SetNextWindowPos below.
         auto screen = glm::project(o->getPosition(), model, proj, viewport);
         if (screen.z >= 1.f) {
             return;

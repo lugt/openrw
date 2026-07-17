@@ -55,12 +55,12 @@ private:
     HUDParameters hudParameters;
 
     /// Scale applied each frame so the design-pixel HUD parameters
-    /// (uiTextSize, uiOuterMargin, uiMapSize, ...) keep their visual size on a
-    /// HiDPI framebuffer. The 2D projection spans the physical viewport, so
-    /// these design values must be multiplied by
-    /// viewport.y / kScreenVirtualHeight (see engine/ScreenText.hpp) to match.
-    /// Computed at the start of each draw call.
-    float dpiScale = 1.f;
+    /// (uiTextSize, uiOuterMargin, uiMapSize, ...) keep their visual size
+    /// relative to the 640x480 reference. The 2D projection spans the logical
+    /// (window) size, so design values are multiplied by
+    /// logicalSize.y / kScreenVirtualHeight (see engine/ScreenText.hpp) to map
+    /// from design space into logical space. Computed at the start of each draw.
+    float designScale = 1.f;
 
     void drawScriptTimer(GameWorld* world, GameRenderer& render);
     void drawMap(ViewCamera& currentView, ai::PlayerController* player,

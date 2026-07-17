@@ -456,7 +456,8 @@ void DebugState::handleEvent(const SDL_Event& event) {
 
         case SDL_MOUSEMOTION:
             if (game->hasFocus()) {
-                glm::ivec2 screenSize = getWindow().getSize();
+                // xrel is a logical-pixel delta; normalise by logical size.
+                glm::ivec2 screenSize = getWindow().getLogicalSize();
                 glm::vec2 mouseMove(
                     event.motion.xrel / static_cast<float>(screenSize.x),
                     event.motion.yrel / static_cast<float>(screenSize.y));
