@@ -76,6 +76,12 @@ private:
     glm::vec3 updateMovementAnimation(float dt);
     glm::vec3 currenteMovementStep{};
 
+    // Pending displacement accumulated by ContactProcessedCallback during the
+    // physics substep; applied and cleared in updateCharacter(). Kinematic
+    // bodies aren't pushed by Bullet, so impacts/separations are applied here.
+    glm::vec3 pendingKnockback{};        // vehicle impact velocity (decays)
+    glm::vec3 pendingSeparationVel{};    // residual separation velocity (decays)
+
     AnimCycle cycle_ = AnimCycle::Idle;
 
 public:
@@ -144,6 +150,18 @@ public:
     bool isKnockedDown() const;
 
     bool takeDamage(const DamageInfo& damage) override;
+
+    /// Apply knockback from a vehicle impact. dir is the unit horizontal
+    /// vector pointing from the vehicle toward the character; impulse is the
+    /// contact impulse. Keeps the largest knockback seen this frame.
+    void applyVehicleImpact(const glm::vec3& dir, float impulse);
+
+    /// Accumulate a separation velocity (e.g. to resolve character-character
+    /// overlap). Unlike a one-shot position nudge, this feeds back into the
+    /// walk direction so the character keeps moving apart for a few frames -
+    /// closer to how a dynamic-body impulse would behave and far less jittery
+    /// than repeatedly teleporting kinematic peds apart each frame.
+    void applySeparation(const glm::vec3& vel);
 
     bool enterVehicle(VehicleObject* vehicle, size_t seat);
 

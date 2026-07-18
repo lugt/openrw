@@ -705,6 +705,60 @@ void handleInstanceResponse(InstanceObject* instance, const btManifoldPoint& mp,
                              impulse
                          });
 }
+
+void handleCharacterVehicleResponse(CharacterObject* ch,
+                                    const btManifoldPoint& mp, bool chIsA) {
+    // Vehicle (dynamic body) -> character (kinematic ghost). The contact
+    // impulse is meaningful only on the dynamic side; we drive the character
+    // response from it directly.
+    if (mp.getAppliedImpulse() <= 100.f) return;
+    if (ch->getCurrentVehicle()) return;  // occupants are shielded by the car
+
+    // m_normalWorldOnB points from body A toward body B. We want the
+    // vehicle -> character direction so the knockback pushes the ped away.
+    btVector3 normal = chIsA ? -mp.m_normalWorldOnB : mp.m_normalWorldOnB;
+    normal.setZ(0.f);
+    if (normal.length2() < 1e-6f) return;
+    normal.normalize();
+
+    const btVector3 dmg = chIsA ? mp.m_positionWorldOnA : mp.m_positionWorldOnB;
+
+    ch->takeDamage({GameObject::DamageInfo::DamageType::Physics,
+                    {dmg.x(), dmg.y(), dmg.z()},
+                    {dmg.x() - normal.x(), dmg.y() - normal.y(), dmg.z()},
+                    mp.getAppliedImpulse() * 0.5f,
+                    mp.getAppliedImpulse()});
+    ch->applyVehicleImpact(glm::vec3(normal.x(), normal.y(), 0.f),
+                           mp.getAppliedImpulse());
+}
+
+void handleCharacterCharacterResponse(CharacterObject* a, CharacterObject* b,
+                                      const btManifoldPoint& mp) {
+    (void)mp;
+    // Two kinematic ghosts produce no impulse resolution, so resolve overlap
+    // directly: push each character half the penetration apart along the
+    // connecting line (horizontal plane only).
+    const auto pa = a->getPosition();
+    const auto pb = b->getPosition();
+    btVector3 d(pb.x - pa.x, pb.y - pa.y, 0.f);
+    float dist = d.length();
+    if (dist < 1e-3f) {
+        d.setValue(1.f, 0.f, 0.f);
+        dist = 1e-3f;
+    } else {
+        d /= dist;
+    }
+    constexpr float kRadiusSum = 0.9f;  // ~2 * capsule radius (0.45)
+    const float overlap = kRadiusSum - dist;
+    if (overlap <= 0.05f) return;  // dead zone to suppress jitter
+    // Separation velocity proportional to overlap. Decay in updateCharacter
+    // keeps it moving apart for a few frames, so a modest speed suffices.
+    constexpr float kSepVelScale = 6.f;
+    const float sepVel = overlap * kSepVelScale;
+    const btVector3 half = d * (sepVel * 0.5f);
+    a->applySeparation(glm::vec3(-half.x(), -half.y(), 0.f));
+    b->applySeparation(glm::vec3(half.x(), half.y(), 0.f));
+}
 }  // namespace
 
 bool GameWorld::ContactProcessedCallback(btManifoldPoint& mp, void* body0,
@@ -740,6 +794,20 @@ bool GameWorld::ContactProcessedCallback(btManifoldPoint& mp, void* body0,
     // Handle vehicles
     if (a) handleVehicleResponse(a, mp, true);
     if (b) handleVehicleResponse(b, mp, false);
+
+    // Handle characters: vehicle <-> ped (and any dynamic body <-> ped) and
+    // ped <-> ped. Kinematic bodies aren't pushed by Bullet, so the response
+    // is applied as pending displacement consumed in updateCharacter().
+    const bool aIsChar = a && a->type() == GameObject::Character;
+    const bool bIsChar = b && b->type() == GameObject::Character;
+    if (aIsChar != bIsChar) {
+        auto* ch = aIsChar ? static_cast<CharacterObject*>(a)
+                           : static_cast<CharacterObject*>(b);
+        handleCharacterVehicleResponse(ch, mp, aIsChar);
+    } else if (aIsChar && bIsChar) {
+        handleCharacterCharacterResponse(static_cast<CharacterObject*>(a),
+                                        static_cast<CharacterObject*>(b), mp);
+    }
 
     return true;
 }

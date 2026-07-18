@@ -100,7 +100,9 @@ void CharacterObject::createActor(const glm::vec2& size) {
 
         engine->dynamicsWorld->addCollisionObject(
             physObject.get(), btBroadphaseProxy::KinematicFilter,
-            btBroadphaseProxy::StaticFilter | btBroadphaseProxy::SensorTrigger);
+            btBroadphaseProxy::StaticFilter | btBroadphaseProxy::SensorTrigger |
+            btBroadphaseProxy::DefaultFilter |
+            btBroadphaseProxy::KinematicFilter);
         engine->dynamicsWorld->addAction(physCharacter.get());
     }
 }
@@ -350,6 +352,32 @@ void CharacterObject::updateCharacter(float dt) {
      */
 
     if (physCharacter) {
+        // Apply displacement accumulated by ContactProcessedCallback during
+        // the physics substep (knockback from vehicles, separation from other
+        // characters). Kinematic bodies aren't pushed by Bullet, so apply it
+        // here, before the walk-direction integration below.
+        if (glm::dot(pendingKnockback, pendingKnockback) > 1e-4f) {
+            const auto& o = physObject->getWorldTransform().getOrigin();
+            glm::vec3 p(o.x(), o.y(), o.z());
+            p += pendingKnockback * dt;
+            physCharacter->warp(btVector3(p.x, p.y, p.z));
+            pendingKnockback *= 0.85f;  // exponential decay
+            if (glm::dot(pendingKnockback, pendingKnockback) < 0.25f) {  // below ~0.5 speed
+                pendingKnockback = glm::vec3{};
+            }
+        }
+        // Separation is applied as a residual velocity (see below) rather than
+        // a one-shot warp: teleporting kinematic peds apart each frame
+        // fights the AI walk direction and jitters. A decaying velocity keeps
+        // them moving apart for a few frames, closer to a real impulse.
+        // One small positional nudge still resolves initial penetration.
+        if (glm::dot(pendingSeparationVel, pendingSeparationVel) > 1e-4f) {
+            const auto& o = physObject->getWorldTransform().getOrigin();
+            glm::vec3 p(o.x(), o.y(), o.z());
+            p += pendingSeparationVel * dt * 0.5f;
+            physCharacter->warp(btVector3(p.x, p.y, p.z));
+        }
+
         glm::vec3 walkDir = updateMovementAnimation(dt);
 
         if (canTurn()) {
@@ -377,6 +405,18 @@ void CharacterObject::updateCharacter(float dt) {
             currenteMovementStep = walkDir / dt;
         } else {
             currenteMovementStep = glm::vec3();
+        }
+
+        // Feed the residual separation velocity into the walk direction so the
+        // character keeps moving apart for a few frames after contact (rather
+        // than only nudging position once and letting the AI walk straight
+        // back into the overlap). Decays each frame.
+        if (glm::dot(pendingSeparationVel, pendingSeparationVel) > 1e-4f) {
+            currenteMovementStep += pendingSeparationVel;
+            pendingSeparationVel *= 0.6f;
+            if (glm::dot(pendingSeparationVel, pendingSeparationVel) < 0.05f) {
+                pendingSeparationVel = glm::vec3{};
+            }
         }
 
         auto Pos =
@@ -558,6 +598,45 @@ bool CharacterObject::takeDamage(const GameObject::DamageInfo& dmg) {
         Die();
     }
     return true;
+}
+
+void CharacterObject::applyVehicleImpact(const glm::vec3& dir, float impulse) {
+    if (!physCharacter) return;
+    if (impulse <= 100.f) return;  // reuse the vehicle damage threshold
+    if (getCurrentVehicle()) return;  // occupants aren't knocked around
+
+    // Horizontal direction: vehicle -> character.
+    glm::vec3 d(dir.x, dir.y, 0.f);
+    const float len = glm::length(d);
+    if (len < 1e-3f) return;
+    d /= len;
+
+    constexpr float kKnockScale = 0.02f;
+    constexpr float kKnockMin = 3.f;
+    constexpr float kKnockMax = 18.f;
+    const float speed = std::clamp(impulse * kKnockScale, kKnockMin, kKnockMax);
+    const glm::vec3 knock = d * speed;
+
+    // Keep the strongest knockback seen this frame (a substep may report
+    // multiple contact points for the same pair).
+    if (glm::length(knock) > glm::length(pendingKnockback)) {
+        pendingKnockback = knock;
+    }
+}
+
+void CharacterObject::applySeparation(const glm::vec3& vel) {
+    if (!physCharacter) return;
+    // Take the larger component (keep separation moving in the dominant
+    // direction rather than cancelling out across contact points).
+    if (glm::dot(vel, vel) > glm::dot(pendingSeparationVel, pendingSeparationVel)) {
+        pendingSeparationVel = vel;
+    }
+    // Clamp so separation can't fling a ped through a wall.
+    constexpr float kMaxSep = 6.f;
+    const float len = glm::length(pendingSeparationVel);
+    if (len > kMaxSep) {
+        pendingSeparationVel *= kMaxSep / len;
+    }
 }
 
 void CharacterObject::jump() {
